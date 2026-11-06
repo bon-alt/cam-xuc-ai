@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Nhận Diện 7 Cảm Xúc</title>
+  <!-- Tải thư viện AI nhận diện cảm xúc trên trình duyệt -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 100vh; background-color: #121212; color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    h2 { margin-bottom: 5px; }
+    #status { color: #00e676; margin-bottom: 15px; font-weight: bold; }
+    .video-container {
+      position: relative;
+      width: 640px; height: 480px;
+      max-width: 95vw;
+      border: 3px solid #00e676; border-radius: 12px; overflow: hidden;
+    }
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    canvas { position: absolute; top: 0; left: 0; transform: scaleX(-1); }
+    #emotion-result {
+      margin-top: 15px; font-size: 24px; font-weight: bold;
+      padding: 10px 25px; background: #1e1e1e; border-radius: 8px;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>AI Nhận Diện Cảm Xúc Thời Gian Thực</h2>
+  <div id="status">Vui lòng đợi vài giây.</div>
+
+  <div class="video-container">
+    <video id="video" autoplay muted playsinline></video>
+  </div>
+
+  <div id="emotion-result">Cảm xúc: Đang chờ khuôn mặt...</div>
+
+  <script>
+    const video = document.getElementById('video');
+    const statusText = document.getElementById('status');
+    const resultText = document.getElementById('emotion-result');
+
+    // Bản đồ dịch 7 cảm xúc sang Tiếng Việt
+    const emotionMap = {
+      neutral: "Bình thường 😐",
+      happy: "Vui vẻ 😄",
+      sad: "Buồn bã 😢",
+      angry: "Giận dữ 😠",
+      fearful: "Sợ hãi 😨",
+      disgusted: "Kinh tởm 🤢",
+      surprised: "Ngạc nhiên 😲"
+    };
+
+    // 1. Tải trọng số AI từ CDN
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+        ]);
+        statusText.innerText = "Đã tải xong AI! Đang mở Webcam...";
+        startVideo();
+      } catch (err) {
+        statusText.innerText = "Lỗi tải mô hình: Cần có kết nối Internet.";
+      }
+    });
+
+    // 2. Kích hoạt Webcam
+    function startVideo() {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          video.srcObject = stream;
+          statusText.innerText = "Đang hoạt động";
+        })
+        .catch(err => {
+          statusText.style.color = "#ff5252";
+          statusText.innerText = "Không thể mở Camera! Hãy mở qua HTTPS (GitHub Pages) hoặc localhost.";
+        });
+    }
+
+    // 3. Nhận diện liên tục khi video chạy
+    video.addEventListener('play', () => {
+      setInterval(async () => {
+        const detections = await faceapi.detectAllFaces(
+          video, new faceapi.TinyFaceDetectorOptions()
+        ).withFaceExpressions();
+
+        if (detections.length > 0) {
+          const expressions = detections[0].expressions;
+          // Tìm cảm xúc có tỷ lệ phần trăm cao nhất trong 7 cảm xúc
+          const maxEmotion = Object.keys(expressions).reduce((a, b) => 
+            expressions[a] > expressions[b] ? a : b
+          );
+          const confidence = (expressions[maxEmotion] * 100).toFixed(0);
+          resultText.innerText = `Cảm xúc: ${emotionMap[maxEmotion]} (${confidence}%)`;
+        } else {
+          resultText.innerText = "Cảm xúc: Không tìm thấy khuôn mặt";
+        }
+      }, 150);
+    });
+  </script>
+</body>
+</html>
